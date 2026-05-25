@@ -695,6 +695,9 @@ class MainWindow(QMainWindow):
                 am.voice_line = self._build_voice_line(am)
             except Exception:
                 am.voice_line = ""
+        # Pre-generate Kokoro WAV files in the background so the first
+        # navigation after analysis is a cache hit (<100ms) not an inference.
+        self.voice.prebuild([am.voice_line for am in result.moves if am.voice_line])
 
         # ── Auto-flip the board to match the user's color ──────────────────
         # If we recognise sjefenfabian as Black, flip the board so Black sits

@@ -141,7 +141,9 @@ class Voice:
         self._kvoice       = "af_heart"
         self._kspeed       = 1.0
         self._player       = AudioPlayer()
-        self._kq: queue.Queue = queue.Queue()
+        self._kq: queue.Queue  = queue.Queue()   # on-demand (high priority)
+        self._pbq: queue.Queue = queue.Queue()   # prebuild  (low priority)
+        self._audio_cache: dict[str, str] = {}   # text → pre-generated wav path
         self._kstop        = threading.Event()
         self.kokoro_ready  = False
 
@@ -246,16 +248,52 @@ class Voice:
 
     def _kokoro_worker(self) -> None:
         while True:
-            text = self._kq.get()
+            # On-demand (_kq) has priority over prebuild (_pbq).
+            # get_nowait() on _kq so we never block waiting for on-demand
+            # when there is prebuild work to do instead.
+            is_prebuild = False
+            try:
+                text = self._kq.get_nowait()
+            except queue.Empty:
+                try:
+                    text = self._pbq.get(timeout=0.2)
+                    is_prebuild = True
+                except queue.Empty:
+                    continue
+
             if text is None:
                 break
-            if self._kstop.is_set() or self._kokoro is None:
+            if self._kokoro is None:
                 continue
+            # On-demand items respect the stop signal; prebuild items always
+            # run to completion so the cache stays warm.
+            if not is_prebuild and self._kstop.is_set():
+                continue
+            # Skip prebuild if already cached or an on-demand item is waiting
+            if is_prebuild and (text in self._audio_cache or not self._kq.empty()):
+                continue
+
+            # Cache hit → instant play (no inference needed)
+            cached = self._audio_cache.get(text)
+            if cached and os.path.exists(cached):
+                if not is_prebuild and not self._kstop.is_set():
+                    self._player.play(cached)
+                    try:
+                        duration = sf.info(cached).duration
+                    except Exception:
+                        duration = 3.0
+                    deadline = time.time() + duration + 0.5
+                    while time.time() < deadline and not self._kstop.is_set():
+                        time.sleep(0.05)
+                continue
+
+            # Cache miss → run inference, then cache the WAV
             try:
                 audio, sr = self._kokoro.create(
                     text, voice=self._kvoice, speed=self._kspeed, lang="en-us"
                 )
-                if self._kstop.is_set():
+                # For on-demand: if stopped mid-inference, discard result
+                if not is_prebuild and self._kstop.is_set():
                     continue
                 vol = max(0.0, min(1.0, self._vol))
                 if vol != 1.0:
@@ -263,14 +301,13 @@ class Voice:
                 tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
                 tmp.close()
                 sf.write(tmp.name, audio, sr)
-                if not self._kstop.is_set():
+                self._audio_cache[text] = tmp.name   # warm the cache
+                if not is_prebuild and not self._kstop.is_set():
                     self._player.play(tmp.name)
-                duration = len(audio) / sr
-                deadline = time.time() + duration + 1.0
-                while time.time() < deadline and not self._kstop.is_set():
-                    time.sleep(0.05)
-                try: os.unlink(tmp.name)
-                except Exception: pass
+                    duration = len(audio) / sr
+                    deadline = time.time() + duration + 0.5
+                    while time.time() < deadline and not self._kstop.is_set():
+                        time.sleep(0.05)
             except Exception:
                 pass
 
@@ -393,12 +430,25 @@ class Voice:
         self._save_settings()
 
     def set_speed(self, s: float) -> None:
-        # Same: update value, worker thread will pick it up.
         self._kspeed = max(0.5, min(2.0, float(s)))
+        self._audio_cache.clear()   # stale — generated at old speed
+        self._drain(self._pbq)
         self._save_settings()
+
+    def prebuild(self, texts: list[str]) -> None:
+        """Queue voice lines for background audio generation right after analysis.
+
+        The worker drains this at low priority so on-demand navigation is never
+        blocked. Cache hits in speak() skip inference entirely (<100ms latency).
+        """
+        for t in texts:
+            if t and t not in self._audio_cache:
+                self._pbq.put(t)
 
     def set_kokoro_voice(self, voice_id: str) -> None:
         self._kvoice = voice_id
+        self._audio_cache.clear()   # stale — generated with old voice
+        self._drain(self._pbq)
         self._save_settings()
 
     def set_read_color(self, color: str) -> None:
