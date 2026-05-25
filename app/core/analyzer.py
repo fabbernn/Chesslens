@@ -129,9 +129,10 @@ def classify(delta: float,
         elif delta >= -2.50: return "mistake"
         else:                return "blunder"
 
-    # Middlegame / endgame — strict thresholds (chess.com-style)
-    if   delta >= -0.30: return "good"      # ≤0.3 pawn loss: close to optimal
-    elif delta >= -0.80: return "inaccuracy"
+    # Middlegame / endgame — chess.com-aligned thresholds
+    # Blunder requires a minimum -2.0 swing; -0.38 is never a blunder.
+    if   delta >= -0.10: return "good"
+    elif delta >= -0.50: return "inaccuracy"
     elif delta >= -2.00: return "mistake"
     else:                return "blunder"
 

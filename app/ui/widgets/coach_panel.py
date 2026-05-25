@@ -460,17 +460,38 @@ class CoachPanel(QScrollArea):
 
         # Card 3 — engine continuation (PV) — skip for game-end positions
         if not is_game_end and analyzed_move.best_pv and len(analyzed_move.best_pv) >= 2:
-            pv_str = self._format_pv(analyzed_move.best_pv[:4])
+            pv_str = self._format_pv(analyzed_move.best_pv[:4],
+                                     analyzed_move.fen_after)
             if pv_str:
                 self._add_card("Engine continuation", pv_str,
                                COLORS.text_dim, delay_ms=160)
 
     # ─────────────────────────────────────────────────────────────────────
     @staticmethod
-    def _format_pv(pv) -> str:
-        """Format moves as 'e4 e5 Nf3' — UCI to readable."""
-        parts = []
+    def _format_pv(pv, fen: str | None = None) -> str:
+        """Format PV as SAN notation using the given FEN, falling back to UCI."""
+        if not pv:
+            return ""
+        import chess
+        parts: list[str] = []
+        if fen:
+            try:
+                board = chess.Board(fen)
+                for m in pv:
+                    try:
+                        parts.append(board.san(m))
+                        board.push(m)
+                    except Exception:
+                        try:
+                            parts.append(m.uci())
+                            board.push(m)
+                        except Exception:
+                            break
+                return " ".join(parts)
+            except Exception:
+                pass
+        # Fallback: UCI coordinate pairs
         for m in pv:
             u = m.uci()
-            parts.append(f"{u[:2]}–{u[2:4]}")
-        return "  ›  ".join(parts)
+            parts.append(f"{u[:2]}→{u[2:4]}")
+        return " ".join(parts)

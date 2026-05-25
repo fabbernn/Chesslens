@@ -126,7 +126,7 @@ class MoveExplainer:
 
         # If played the engine's choice, just affirm it
         if played_move == best_move or played_is_best:
-            return self._explain_good_move(board_before, played_move)
+            return self._explain_good_move(board_before, played_move, move_number)
 
         # ── OPENING-PRINCIPLE AWARENESS ──────────────────────────────────
         # Many legitimate openings (Cow, London, hypermodern systems) are
@@ -154,14 +154,35 @@ class MoveExplainer:
         board_played = board_before.copy()
         board_played.push(played_move)
 
+        # ─── TACTICAL PATTERN DETECTION ──────────────────────────────────
+        cap_by_best       = board_before.piece_at(best_move.to_square)
+        _gives_check      = board_best.is_check()
+        _is_discovered_check = False
+        _is_sacrifice     = (cap_by_best is not None and best_piece is not None
+                             and PV.get(best_piece.piece_type, 0)
+                                 > PV.get(cap_by_best.piece_type, 0))
+
+        # Fork: moving piece attacks ≥2 opponent pieces of value ≥3, or king.
+        # Using pval >= 3 so equal-value pieces (N vs B) count as fork targets.
+        _fork_targets: list = []
+        if best_piece:
+            for _sq2 in board_best.attacks(best_move.to_square):
+                _p = board_best.piece_at(_sq2)
+                if _p and _p.color != best_piece.color:
+                    if PV.get(_p.piece_type, 0) >= 3 or _p.piece_type == chess.KING:
+                        _fork_targets.append((_sq2, _p))
+        _is_fork = len(_fork_targets) >= 2
+
+        # Hanging capture: captured piece has no defenders before the move
+        _cap_is_hanging = (cap_by_best is not None and
+                           not board_before.attackers(cap_by_best.color,
+                                                      best_move.to_square))
+
         # ─── REASONS THE BEST MOVE IS GOOD ──────────────────────────────
         # 1. Captures a piece
-        cap_by_best = board_before.piece_at(best_move.to_square)
         if cap_by_best:
-            attackers = board_before.attackers(played_piece.color,
-                                                best_move.to_square)
-            defenders = board_before.attackers(not played_piece.color,
-                                                best_move.to_square)
+            defenders = board_before.attackers(cap_by_best.color,
+                                               best_move.to_square)
             best_val = PV.get(best_piece.piece_type, 0)
             cap_val  = PV.get(cap_by_best.piece_type, 0)
             if not defenders or cap_val >= best_val:
@@ -176,28 +197,31 @@ class MoveExplainer:
                 )
 
         # 2. Gives check
-        if board_best.is_check():
+        if _gives_check:
             if board_best.is_checkmate():
                 reasons.append("deliver checkmate")
             else:
-                reasons.append("give check, forcing the opponent to respond")
+                checkers = board_best.checkers()
+                _is_discovered_check = (bool(checkers)
+                                        and best_move.to_square not in checkers)
+                if _is_discovered_check:
+                    reasons.append("create a discovered check")
+                else:
+                    reasons.append("give check")
 
-        # 3. Fork / multi-attack
-        attacked_by_moved = board_best.attacks(best_move.to_square)
-        valuable_attacks = []
-        for sq in attacked_by_moved:
-            p = board_best.piece_at(sq)
-            if p and p.color != best_piece.color:
-                pval = PV.get(p.piece_type, 0)
-                mover_val = PV.get(best_piece.piece_type, 0)
-                if pval > mover_val or p.piece_type == chess.KING:
-                    valuable_attacks.append((sq, p))
-        if len(valuable_attacks) >= 2:
-            names = [PN[p.piece_type] for _, p in valuable_attacks[:2]]
-            reasons.append(f"fork the opponent's {' and '.join(names)}")
-        elif valuable_attacks and not cap_by_best:
-            sq, p = valuable_attacks[0]
-            reasons.append(f"attack the {PN[p.piece_type]} on {_sq(sq)}")
+        # 3. Fork / multi-attack (reuses _fork_targets)
+        if _is_fork:
+            if _gives_check:
+                # Check already in reasons; name the forked piece too
+                _nk = [p for _, p in _fork_targets if p.piece_type != chess.KING]
+                if _nk:
+                    reasons.append(f"also fork the {PN[_nk[0].piece_type]}")
+            else:
+                _names = [PN[p.piece_type] for _, p in _fork_targets[:2]]
+                reasons.append(f"fork the opponent's {' and '.join(_names)}")
+        elif _fork_targets and not cap_by_best:
+            _fsq, _fp = _fork_targets[0]
+            reasons.append(f"attack the {PN[_fp.piece_type]} on {_sq(_fsq)}")
 
         # 4. Castles
         if board_before.is_castling(best_move):
@@ -205,8 +229,9 @@ class MoveExplainer:
                     else "queenside")
             reasons.append(f"castle {side} and put the king in safety")
 
-        # 5. Develops a minor piece (early game)
+        # 5. Develops a minor piece — opening only (move ≤ 12)
         if (move_number <= EARLY_DEVELOPMENT_PLY and not reasons
+                and best_piece is not None
                 and best_piece.piece_type in (chess.KNIGHT, chess.BISHOP)):
             home_rank = 0 if is_white else 7
             if chess.square_rank(best_move.from_square) == home_rank:
@@ -215,8 +240,9 @@ class MoveExplainer:
                     f"toward active squares"
                 )
 
-        # 6. Central control by pawn (e.g. d4/e4)
+        # 6. Central control by pawn (e.g. d4/e4) — opening only
         if (move_number <= EARLY_CENTRAL_PAWN_PLY and not reasons
+                and best_piece is not None
                 and best_piece.piece_type == chess.PAWN
                 and best_move.to_square in CENTER_INNER):
             reasons.append(
@@ -278,10 +304,9 @@ class MoveExplainer:
             if abs(delta) >= 2.0:
                 reasons.append("avoid significant material loss")
             elif abs(delta) >= 0.8:
-                reasons.append(
-                    "keep better piece coordination and central control")
+                reasons.append("keep better piece coordination")
             else:
-                reasons.append("achieve slightly better piece activity")
+                reasons.append("improve piece activity")
 
         reasons_str = " and ".join(reasons[:2])
 
@@ -295,24 +320,114 @@ class MoveExplainer:
             voice = (f"You played {played_san}, but {best_san} was stronger."
                      f" It would {reasons_str}.")
 
-        card_parts = [
-            f"Better: {best_san} ({_fmt_move(best_move)})",
-            f"This would {reasons_str}.",
-        ]
-        if played_problems:
-            card_parts.append(
-                f"Problem with your move: {played_problems[0]}.")
+        card_parts = [f"Better: {best_san}"]
 
-        # Engine PV continuation
-        if best_pv and len(best_pv) >= 3:
-            tmp = board_before.copy()
-            tmp.push(best_pv[0])
+        # Local helpers — close over card_parts and self
+        def _add_pv():
+            if best_pv:
+                s = self._pv_san(board_before, best_pv[:4])
+                if s:
+                    card_parts.append(f"Engine line: {s}.")
+
+        def _add_continuation():
+            """Append 'After X, Y outcome.' using the engine PV follow-up."""
+            if not (best_pv and len(best_pv) >= 3):
+                return
+            resp = self._natural_response(board_best)
+            if not resp:
+                return
+            r_san = self._safe_san(board_best, resp)
+            b = board_best.copy()
+            b.push(resp)
+            fu = best_pv[2]
+            cap_f = b.piece_at(fu.to_square)
+            f_san = self._safe_san(b, fu)
             try:
-                tmp.push(best_pv[1])
-                third = tmp.san(best_pv[2])
-                card_parts.append(f"Engine plan: {best_san} … then {third}.")
+                bf = b.copy()
+                bf.push(fu)
+                if bf.is_checkmate():
+                    out = "delivers checkmate"
+                elif bf.is_check() and cap_f:
+                    out = f"wins the {PN[cap_f.piece_type]} with check"
+                elif bf.is_check():
+                    out = "continues the attack with another check"
+                elif cap_f:
+                    out = f"wins the {PN[cap_f.piece_type]}"
+                else:
+                    out = "leaves the king exposed"
+                card_parts.append(f"After {r_san}, {f_san} {out}.")
             except Exception:
                 pass
+
+        # ── Card body — lead with the tactical pattern name ──────────────
+        if board_best.is_checkmate():
+            card_parts.append("This delivers checkmate.")
+
+        elif _is_fork and _gives_check:
+            pname = PN.get(best_piece.piece_type, "piece") if best_piece else "piece"
+            non_king = next(
+                (p for _, p in _fork_targets if p.piece_type != chess.KING), None
+            )
+            fname = PN[non_king.piece_type] if non_king else "piece"
+            card_parts.append(
+                f"Fork with check — the {pname} attacks the king and the "
+                f"{fname} simultaneously. Once the check is dealt with, "
+                f"the {fname} falls."
+            )
+            _add_continuation()
+            _add_pv()
+
+        elif _is_fork:
+            pname  = PN.get(best_piece.piece_type, "piece") if best_piece else "piece"
+            fnames = [PN[p.piece_type] for _, p in _fork_targets[:2]]
+            card_parts.append(
+                f"Fork — the {pname} attacks the {fnames[0]} and the "
+                f"{fnames[1]} at the same time, winning material."
+            )
+            if played_problems:
+                card_parts.append(f"Problem with your move: {played_problems[0]}.")
+            _add_pv()
+
+        elif _gives_check:
+            pname = PN.get(best_piece.piece_type, "piece") if best_piece else "piece"
+            check_type = "discovered check" if _is_discovered_check else "check"
+            if _is_sacrifice:
+                cname = PN.get(cap_by_best.piece_type, "piece") if cap_by_best else "piece"
+                card_parts.append(
+                    f"Piece sacrifice — the {pname} captures a {cname} "
+                    f"to deliver {check_type}, forcing the king to move."
+                )
+            else:
+                card_parts.append(
+                    f"This {pname} {check_type} forces the opponent to respond."
+                )
+            _add_continuation()
+            _add_pv()
+
+        elif _cap_is_hanging:
+            card_parts.append(
+                f"Winning the {PN[cap_by_best.piece_type]} — it was undefended."
+            )
+            if played_problems:
+                card_parts.append(f"Problem with your move: {played_problems[0]}.")
+            _add_pv()
+
+        elif _is_sacrifice:
+            pname = PN.get(best_piece.piece_type, "piece") if best_piece else "piece"
+            cname = PN.get(cap_by_best.piece_type, "piece") if cap_by_best else "piece"
+            card_parts.append(
+                f"Piece sacrifice — giving up the {pname} for a "
+                f"{cname} to {reasons_str}."
+            )
+            if played_problems:
+                card_parts.append(f"Problem with your move: {played_problems[0]}.")
+            _add_pv()
+
+        else:
+            card_parts.append(f"This would {reasons_str}.")
+            if played_problems:
+                card_parts.append(f"Problem with your move: {played_problems[0]}.")
+            _add_pv()
 
         return {
             "reasons":         reasons,
@@ -322,19 +437,76 @@ class MoveExplainer:
         }
 
     # ─── helpers ────────────────────────────────────────────────────────
-    def _explain_good_move(self, board_before, move):
-        """When the user played the best move."""
+    def _explain_good_move(self, board_before, move, move_number=0):
+        """When the user played the best move — lead with the tactical theme."""
         piece = board_before.piece_at(move.from_square)
         cap   = board_before.piece_at(move.to_square)
-        if cap:
-            voice = f"Good capture — winning the {PN[cap.piece_type]}."
+
+        board_after = board_before.copy()
+        board_after.push(move)
+        gives_check  = board_after.is_check()
+        is_checkmate = board_after.is_checkmate()
+
+        # Fork detection (same threshold as main path: pval >= 3 or king)
+        fork_targets: list = []
+        if piece:
+            for sq in board_after.attacks(move.to_square):
+                p = board_after.piece_at(sq)
+                if p and p.color != piece.color:
+                    if PV.get(p.piece_type, 0) >= 3 or p.piece_type == chess.KING:
+                        fork_targets.append((sq, p))
+        is_fork = len(fork_targets) >= 2
+
+        # Hanging capture
+        cap_is_hanging = (cap is not None and piece is not None and
+                          not board_before.attackers(cap.color, move.to_square))
+
+        if is_checkmate:
+            text = "Checkmate!"
+
+        elif is_fork and gives_check:
+            non_king = next(
+                (p for _, p in fork_targets if p.piece_type != chess.KING), None
+            )
+            pname = PN.get(piece.piece_type, "piece")
+            fname = PN[non_king.piece_type] if non_king else "piece"
+            text = (f"Fork with check — the {pname} attacks the king and "
+                    f"the {fname} simultaneously. The opponent can only respond "
+                    f"to the check, then loses the {fname}.")
+
+        elif is_fork:
+            fnames = [PN[p.piece_type] for _, p in fork_targets[:2]]
+            pname  = PN.get(piece.piece_type, "piece")
+            text = (f"Fork — the {pname} attacks the {fnames[0]} and the "
+                    f"{fnames[1]} simultaneously, winning material.")
+
+        elif gives_check:
+            pname = PN.get(piece.piece_type, "piece") if piece else "piece"
+            if cap and cap_is_hanging:
+                text = (f"Good — the {pname} captures the undefended "
+                        f"{PN[cap.piece_type]} and gives check.")
+            elif cap:
+                text = f"Good — capturing with check using the {pname}."
+            else:
+                text = f"Good {pname} check — forces the king to respond."
+
+        elif cap and cap_is_hanging:
+            text = f"Winning the {PN[cap.piece_type]} — it was undefended."
+
+        elif cap:
+            text = f"Good capture — winning the {PN[cap.piece_type]}."
+
         elif board_before.is_castling(move):
-            voice = "Good — castling to king safety."
-        elif piece and piece.piece_type in (chess.KNIGHT, chess.BISHOP):
-            voice = f"Good development of the {PN[piece.piece_type]}."
+            text = "Good — castling to king safety."
+
+        elif (piece and piece.piece_type in (chess.KNIGHT, chess.BISHOP)
+              and move_number <= OPENING_PHASE_PLY):
+            text = f"Good development of the {PN[piece.piece_type]}."
+
         else:
-            voice = "The engine completely agrees with this move."
-        return {"reasons": [], "voice": voice, "card": voice,
+            text = "Good move — improves piece activity and coordination."
+
+        return {"reasons": [], "voice": text, "card": text,
                 "played_problems": []}
 
     def _check_opening_principles(self, board_before, move,
@@ -461,6 +633,34 @@ class MoveExplainer:
             if min_atk_val < pval and not defenders:
                 threats.append((sq, pval))
         return threats
+
+    def _pv_san(self, board, pv) -> str:
+        """Walk a PV list on a copy of board, returning space-separated SAN."""
+        board = board.copy()
+        parts = []
+        for m in pv:
+            try:
+                parts.append(board.san(m))
+                board.push(m)
+            except Exception:
+                try:
+                    parts.append(m.uci())
+                    board.push(m)
+                except Exception:
+                    break
+        return " ".join(parts)
+
+    def _natural_response(self, board):
+        """Pick the most natural response to a check: king move, then capture."""
+        king_sq = board.king(board.turn)
+        for m in board.legal_moves:
+            if m.from_square == king_sq:
+                return m
+        for m in board.legal_moves:
+            if board.is_capture(m):
+                return m
+        moves = list(board.legal_moves)
+        return moves[0] if moves else None
 
     def _safe_san(self, board, move):
         """Return SAN, falling back to UCI if illegal in this position."""
