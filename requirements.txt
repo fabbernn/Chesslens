@@ -1,0 +1,19 @@
+# ChessLens runtime dependencies
+# Python 3.10+ required (PySide6 minimum)
+# Python 3.14 supported (PySide6 6.11+)
+
+# ─── Core UI ──────────────────────────────────────────────────────────────
+PySide6>=6.11.0
+
+# ─── Chess logic ──────────────────────────────────────────────────────────
+chess>=1.10.0
+
+# ─── Voice synthesis ──────────────────────────────────────────────────────
+pyttsx3>=2.90        # fallback voice (Windows SAPI, etc.)
+kokoro-onnx>=0.4.0   # premium AI voice
+soundfile>=0.12.1
+numpy>=1.26.0
+psutil>=5.9.0        # onnxruntime needs this; missing it = silent fallback
+
+# ─── Image handling (chess piece SVG rasterization) ───────────────────────
+Pillow>=10.0.0
