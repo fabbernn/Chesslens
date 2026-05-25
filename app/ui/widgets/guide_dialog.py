@@ -33,8 +33,8 @@ _STEPS: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
-_STEP_H    = 44   # px height per step row
-_STEP_GAP  = 12   # px gap between steps
+_STEP_H    = 56   # px height per step row (enough for 2-line wrapping text)
+_STEP_GAP  = 10   # px gap between steps
 _SLIDE_PX  = 8    # px downward offset at animation start
 _CARD_W    = 480
 _CARD_PAD  = SPACE.xl   # 24px — matches card margin
