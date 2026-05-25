@@ -39,6 +39,7 @@ from app.ui.board_themes import BOARD_THEMES, load_board_theme, save_board_theme
 from app.ui.piece_sets import load_piece_set, save_piece_set
 from app.ui.widgets.board import BoardView
 from app.ui.widgets.board_customize_dialog import BoardCustomizeDialog
+from app.ui.widgets.guide_dialog import GuideDialog
 from app.ui.widgets.coach_panel import CoachPanel, OpeningStrip, QuickActionBar
 from app.core.opening_detector import detect as detect_opening
 from app.ui.widgets.eval_bar import EvalBar
@@ -126,12 +127,37 @@ class LeftPanel(QFrame):
         layout.setContentsMargins(SPACE.lg, SPACE.lg, SPACE.lg, SPACE.md)
         layout.setSpacing(SPACE.lg)
 
+        _header = QWidget()
+        _header.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+        _hbox = QVBoxLayout(_header)
+        _hbox.setContentsMargins(0, 0, 0, 0)
+        _hbox.setSpacing(8)
+        _title_row = QHBoxLayout()
+        _title_row.setContentsMargins(0, 0, 0, 0)
+        _title_row.setSpacing(SPACE.sm)
         title = QLabel("Game Review")
         title.setStyleSheet(
-            f"font-size: {FONTS.xl}pt; font-weight: 600; color: {COLORS.text};"
-            f" border-bottom: 1px solid {COLORS.border_subtle}; padding-bottom: 8px;"
+            f"font-size: {FONTS.xl}pt; font-weight: 600; color: {COLORS.text}; border: none;"
         )
-        layout.addWidget(title)
+        _title_row.addWidget(title, 1)
+        self.btn_guide = QPushButton("?")
+        self.btn_guide.setFixedSize(22, 22)
+        self.btn_guide.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_guide.setToolTip("Quick-start guide: how to get your PGN")
+        self.btn_guide.setStyleSheet(
+            f"QPushButton {{ background: transparent; color: {COLORS.text_dim};"
+            f" font-size: {FONTS.sm}pt; font-weight: 700;"
+            f" border: 1px solid {COLORS.border}; border-radius: 11px; }}"
+            f"QPushButton:hover {{ color: {COLORS.text_muted};"
+            f" border-color: {COLORS.border_focus}; }}"
+        )
+        _title_row.addWidget(self.btn_guide, 0, Qt.AlignmentFlag.AlignVCenter)
+        _hbox.addLayout(_title_row)
+        _div = QFrame()
+        _div.setFixedHeight(1)
+        _div.setStyleSheet(f"background-color: {COLORS.border_subtle};")
+        _hbox.addWidget(_div)
+        layout.addWidget(_header)
 
         self.pgn = PgnInput()
         layout.addWidget(self.pgn)
@@ -623,7 +649,11 @@ class MainWindow(QMainWindow):
         self._exit_fs_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         self._exit_fs_shortcut.activated.connect(self._exit_fullscreen)
 
+        self.left.btn_guide.clicked.connect(self._show_guide)
+
         QTimer.singleShot(50, self.center.board.setFocus)
+        if not self.user_profile.guide_seen:
+            QTimer.singleShot(600, self._show_guide)
 
     # ─────────────────────────────────────────────────────────────────────
     #  ANALYSIS LIFECYCLE
@@ -1082,6 +1112,11 @@ class MainWindow(QMainWindow):
         """
         if self.isFullScreen():
             self.showMaximized()
+
+    def _show_guide(self) -> None:
+        dlg = GuideDialog(self)
+        dlg.got_it.connect(self.user_profile.mark_guide_seen)
+        dlg.exec()
 
     def _open_profile(self) -> None:
         """Top-bar 👤 button: open the username manager.

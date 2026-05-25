@@ -35,6 +35,7 @@ class UserProfile:
     """All identities the user goes by. Matched case-insensitively."""
 
     usernames: list = field(default_factory=list)
+    guide_seen: bool = False
     # Listeners invoked whenever the username list changes — lets UI react
     # (e.g. refresh the player labels, re-evaluate auto color detection).
     _listeners: list = field(default_factory=list, repr=False)
@@ -74,6 +75,7 @@ class UserProfile:
             if s and s.lower() not in seen:
                 seen.add(s.lower())
                 p.usernames.append(s)
+        p.guide_seen = bool(data.get("guide_seen", False))
         return p
 
     def save(self) -> None:
@@ -85,7 +87,10 @@ class UserProfile:
             PROFILE_PATH.parent.mkdir(parents=True, exist_ok=True)
             tmp = PROFILE_PATH.with_suffix(".json.tmp")
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump({"usernames": self.usernames}, f, indent=2)
+                json.dump(
+                    {"usernames": self.usernames, "guide_seen": self.guide_seen},
+                    f, indent=2,
+                )
             os.replace(tmp, PROFILE_PATH)
         except OSError as e:
             _log.warning(
@@ -139,5 +144,9 @@ class UserProfile:
         return None
 
     # ── Listeners ──────────────────────────────────────────────────────
+    def mark_guide_seen(self) -> None:
+        self.guide_seen = True
+        self.save()
+
     def on_change(self, callback: Callable[[], None]) -> None:
         self._listeners.append(callback)
