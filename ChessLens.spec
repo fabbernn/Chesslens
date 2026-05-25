@@ -17,9 +17,11 @@ block_cipher = None
 datas = [
     ("app/resources/sounds", "app/resources/sounds"),
     ("app/resources/icon",   "app/resources/icon"),
+    ("app/resources/icons",  "app/resources/icons"),
     ("app/resources/fonts",  "app/resources/fonts"),
     # Piece set SVGs (added Phase 11 — cburnett / merida / alpha sets)
     ("assets/pieces",        "assets/pieces"),
+    ("assets/openings",      "assets/openings"),
 ]
 
 # These packages all ship JSON / data files that the .exe must carry,

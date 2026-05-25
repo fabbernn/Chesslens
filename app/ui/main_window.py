@@ -106,12 +106,8 @@ class TopBar(QFrame):
         self.btn_profile.setToolTip("Your chess usernames — ChessLens uses these\n"
                                     "to recognize which side was you in a game.")
         self.btn_profile.setFixedWidth(38)
-        self.btn_export  = QPushButton("Export")
-        self.btn_export.setIcon(svg_icon(ICONS_DIR / "export.svg", 14, COLORS.text_muted))
-        self.btn_export.setIconSize(_icon_sz)
-        self.btn_export.setToolTip("Export analysis")
         for b in (self.btn_flip, self.btn_voice, self.btn_pause,
-                  self.btn_profile, self.btn_export):
+                  self.btn_profile):
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             layout.addWidget(b)
 
@@ -300,13 +296,13 @@ class CenterArea(QFrame):
         nav_group = QFrame()
         nav_group.setObjectName("NavGroup")
         nav_group.setStyleSheet(
-            "QFrame#NavGroup { background-color: #252320; border-radius: 8px;"
-            " border: 1px solid #3a3835; }"
-            "QFrame#NavGroup QPushButton { background: transparent; border: none;"
-            " border-radius: 6px; padding: 0; min-width: 36px; max-width: 36px;"
-            " min-height: 36px; max-height: 36px; }"
-            "QFrame#NavGroup QPushButton:hover { background-color: #333028; }"
-            "QFrame#NavGroup QPushButton:pressed { background-color: #1a1917; }"
+            f"QFrame#NavGroup {{ background-color: {COLORS.bg_card}; border-radius: 8px;"
+            f" border: 1px solid {COLORS.border}; }}"
+            f"QFrame#NavGroup QPushButton {{ background: transparent; border: none;"
+            f" border-radius: 6px; padding: 0; min-width: 36px; max-width: 36px;"
+            f" min-height: 36px; max-height: 36px; }}"
+            f"QFrame#NavGroup QPushButton:hover {{ background-color: {COLORS.bg_card_hi}; }}"
+            f"QFrame#NavGroup QPushButton:pressed {{ background-color: {COLORS.bg_input}; }}"
         )
         nav_group.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         nav_gl = QHBoxLayout(nav_group)
@@ -325,8 +321,8 @@ class CenterArea(QFrame):
         self.move_indicator.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.move_indicator.setStyleSheet(
             f"color: {COLORS.text_dim}; font-size: {FONTS.sm}pt;"
-            f" background-color: #252320; border-radius: 10px;"
-            f" border: 1px solid #3a3835; padding: 4px 10px;"
+            f" background-color: {COLORS.bg_card}; border-radius: 10px;"
+            f" border: 1px solid {COLORS.border}; padding: 4px 10px;"
         )
         nav.addWidget(self.move_indicator)
 
