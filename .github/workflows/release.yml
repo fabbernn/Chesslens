@@ -25,7 +25,8 @@ jobs:
           pip install pyinstaller
 
       - name: Build exe
-        run: build_exe.bat
+        run: |
+          python -m PyInstaller ChessLens.spec --noconfirm
         shell: cmd
 
       - name: Upload release asset
