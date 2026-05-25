@@ -616,9 +616,11 @@ class MainWindow(QMainWindow):
         # F11 — toggle true fullscreen (chess.com / IDE convention).
         # Works regardless of which widget currently has focus.
         self._fullscreen_shortcut = QShortcut(QKeySequence("F11"), self)
+        self._fullscreen_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         self._fullscreen_shortcut.activated.connect(self._toggle_fullscreen)
         # Esc — exit fullscreen back to maximized
         self._exit_fs_shortcut = QShortcut(QKeySequence("Escape"), self)
+        self._exit_fs_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         self._exit_fs_shortcut.activated.connect(self._exit_fullscreen)
 
         QTimer.singleShot(50, self.center.board.setFocus)
@@ -942,12 +944,11 @@ class MainWindow(QMainWindow):
         # queuing it before we render the coach cards cuts the perceived
         # delay between move-change and voice-start significantly.
         vt = am.voice_line if getattr(am, "voice_line", None) else self._build_voice_line(am)
+        self.voice.stop()
+        self.center.subtitles.set_text("")
         if self.voice.enabled and vt and not self.voice.paused:
             self.voice.speak(vt)
         elif vt:
-            # Voice off OR paused — keep any leftover speech silent but
-            # still show the subtitle so the user can read along.
-            self.voice.stop()
             self.center.subtitles.set_text(vt)
         else:
             self.center.subtitles.set_text("")

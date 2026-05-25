@@ -79,7 +79,12 @@ class AudioPlayer:
             sysname = platform.system()
             if sysname == "Windows":
                 import winsound
-                winsound.PlaySound(path, winsound.SND_FILENAME)
+                # SND_ASYNC returns immediately so the worker deadline loop
+                # controls timing; SND_PURGE in stop() can then interrupt it.
+                winsound.PlaySound(
+                    path,
+                    winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT,
+                )
             elif sysname == "Darwin":
                 self._proc = subprocess.Popen(
                     ["afplay", path],
@@ -101,6 +106,12 @@ class AudioPlayer:
             pass
 
     def stop(self) -> None:
+        if platform.system() == "Windows":
+            try:
+                import winsound
+                winsound.PlaySound(None, winsound.SND_PURGE)
+            except Exception:
+                pass
         if self._proc is not None:
             try: self._proc.terminate()
             except Exception: pass
@@ -322,22 +333,20 @@ class Voice:
     def speak(self, text: str) -> None:
         if not self.enabled or not text or self.paused:
             return
-        # Subtitle hook — fires on EVERY new line, before any audio starts
+        # Kill any in-flight audio immediately (both Kokoro and fallback).
+        # stop() also fires _on_speak("") to clear the subtitle — we set the
+        # new subtitle right after, so there is no visible blank flash.
+        self.stop()
+        self._kstop.clear()          # re-arm for new speech
+        self._pfallback_stop.clear()
+        # Subtitle for the new line
         try:
             self._on_speak(text)
         except Exception:
             pass
         if self.kokoro_ready and self._kokoro is not None:
-            self._kstop.set()
-            self._player.stop()
-            self._drain(self._kq)
-            self._kstop.clear()
             self._kq.put(text)
         elif self.fallback_ready and self._peng is not None:
-            # The worker thread polls the queue mid-utterance — putting a new
-            # line on the queue causes the current speech to cut off and the
-            # new one to start. Just drain & enqueue here.
-            self._drain(self._pq)
             self._pq.put(text)
 
     def stop(self) -> None:
