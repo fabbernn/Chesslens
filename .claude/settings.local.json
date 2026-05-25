@@ -14,7 +14,11 @@
       "PowerShell(Stop-Process *)",
       "PowerShell(Test-Path *)",
       "PowerShell(winget install *)",
-      "PowerShell(git *)"
+      "PowerShell(git *)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd C:\\\\Users\\\\haard\\\\Documents\\\\chesslens_pyside; git status)",
+      "PowerShell(git reset *)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd C:\\\\Users\\\\haard\\\\Documents\\\\chesslens_pyside; git log --oneline)",
+      "PowerShell(git update-ref *)"
     ]
   }
 }
