@@ -34,5 +34,29 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/ChessLens.exe
+          body: |
+            ## ChessLens v1.0.0
+
+            Free offline chess game analyzer with AI voice coach. No account, no ads, no cloud.
+
+            ### ⚠️ Windows SmartScreen warning
+            When you open the installer, Windows may show a blue warning screen.
+            Click **More info** → **Run anyway**. This is normal for new apps without a paid code signing certificate. ChessLens is fully open source — the complete source code is in this repository.
+
+            ### Install
+            Download **ChessLens_Setup_1.0.0.exe** below and run it. Takes 30 seconds.
+
+            ### First run
+            - Stockfish downloads automatically on first analysis (~10 MB)
+            - Enable Voice in the top bar to download the AI voice model (~100 MB, one time only)
+
+            ### Features
+            - Stockfish depth-16 analysis — same engine chess.com uses
+            - Move classification: !! Brilliant · ★ Best · ! Good · ?! Inaccuracy · ? Mistake · ?? Blunder
+            - AI voice coach narrates every move out loud
+            - Opening detection across 3,700+ openings
+            - Board themes and piece sets
+            - Accuracy scores per player
+            - Works fully offline after first download
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -18,7 +18,15 @@
       "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd C:\\\\Users\\\\haard\\\\Documents\\\\chesslens_pyside; git status)",
       "PowerShell(git reset *)",
       "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd C:\\\\Users\\\\haard\\\\Documents\\\\chesslens_pyside; git log --oneline)",
-      "PowerShell(git update-ref *)"
+      "PowerShell(git update-ref *)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\Git\\\\cmd\"; cd C:\\\\Users\\\\haard\\\\Documents\\\\chesslens_pyside; git log --oneline; git tag)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(gh *)",
+      "PowerShell(gh auth *)",
+      "PowerShell(& \"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" auth status)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\GitHub CLI;C:\\\\Program Files\\\\Git\\\\cmd\"; cd C:\\\\Users\\\\haard\\\\Documents\\\\chesslens_pyside; & \"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" release create v1.0.0 \"dist\\\\ChessLens.exe#ChessLens.exe\" --repo fabbernn/Chesslens --title \"ChessLens v1.0.0\" --notes-file CHANGELOG.md)",
+      "PowerShell(& \"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" release delete v1.0.0 --repo fabbernn/Chesslens --yes 2>&1; Write-Output \"delete attempted\")",
+      "PowerShell(& \"C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe\" release create v1.0.0 \"dist\\\\ChessLens.exe#ChessLens.exe\" --repo fabbernn/Chesslens --title \"ChessLens v1.0.0\" --notes-file CHANGELOG.md)"
     ]
   }
 }

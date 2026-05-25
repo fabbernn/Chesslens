@@ -730,7 +730,7 @@ class MainWindow(QMainWindow):
         self.voice.prebuild([am.voice_line for am in result.moves if am.voice_line])
 
         # ── Auto-flip the board to match the user's color ──────────────────
-        # If we recognise sjefenfabian as Black, flip the board so Black sits
+        # If the detected color is Black, flip the board so Black sits
         # on the bottom — same behaviour as chess.com Game Review. Done
         # idempotently against the current flipped state so it never
         # double-flips on re-analyze.

@@ -1,8 +1,8 @@
 """
 User profile service — tracks who the user is across analyzed games.
 
-The user adds the chess usernames they play under (e.g. "sjefenfabian" on
-chess.com, "anotherhandle" on lichess). When a PGN is loaded, ChessLens
+The user adds the chess usernames they play under (e.g. "hikaru" on
+chess.com, "yourname" on lichess). When a PGN is loaded, ChessLens
 checks the [White] and [Black] headers against this list and detects which
 color the user played — used to:
 

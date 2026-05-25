@@ -80,7 +80,7 @@ class UserProfileDialog(QDialog):
         add_row.setSpacing(SPACE.sm)
 
         self.input = QLineEdit()
-        self.input.setPlaceholderText("e.g. sjefenfabian")
+        self.input.setPlaceholderText("e.g. hikaru, yourname")
         self.input.setStyleSheet(
             f"QLineEdit {{"
             f"  background-color: {COLORS.bg_input};"

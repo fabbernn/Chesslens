@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [1.0.0] - 2026-05-25
 
+> **Windows SmartScreen:** Click "More info" → "Run anyway" when prompted.
+> This is normal for new unsigned apps. ChessLens is fully open source.
+
 ### Added
 - Stockfish engine integration — full game analysis at depth 16
 - Move classification — Brilliant / Best / Good / Inaccuracy / Mistake / Blunder with accuracy scores
